@@ -1,3 +1,4 @@
 *.o
 *~
 rtl_wave
+*.wav
