@@ -22,6 +22,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
+#include <math.h>
 
 #ifndef _WIN32
 #include <unistd.h>
@@ -104,6 +105,7 @@ static void rtlsdr_callback(unsigned char *buf, uint32_t len, void *ctx)
 			bytes_to_read -= len;
 	}
 }
+
 
 
 ///////////////////////////////////
@@ -220,10 +222,14 @@ void wave_header(FILE *file, uint32_t samp_rate, uint32_t frequency, uint32_t bi
     if (fwrite(&chunk, 1, sizeof(chunk_t), file) != sizeof(chunk_t)) exit(1);
 }
 
+float db(float x)
+{
+    return 10 * logf(x);    
+}
+
+int interval_seconds = 2; 
+
 ///////////////////////////////////
-
-
-
 
 
 int main(int argc, char **argv)
@@ -351,7 +357,17 @@ int main(int argc, char **argv)
 		}
 	}
 
+
+        //////////////////////////////////////////
+
+        int interval = 0;
+        float ipeak = 0, qpeak = 0;
+        float iavg = 0, qavg = 0;
+
 	wave_header(file, samp_rate, frequency, 8);
+
+        //////////////////////////////////////////
+
 
 	/* Reset endpoint before we start reading from it (mandatory) */
 	verbose_reset_buffer(dev);
@@ -369,6 +385,34 @@ int main(int argc, char **argv)
 				n_read = bytes_to_read;
 				do_exit = 1;
 			}
+
+
+        //////////////////////////////////////////
+
+        for (int i=0; i < n_read; i += 2)
+        {
+            float ival = (float) (buffer[i] - 128) / 128;
+            float qval = (float) (buffer[i+1] - 128) / 128;
+            ival = ival * ival;
+            qval = qval * qval;
+            iavg += ival;
+            qavg += qval;
+            if (ival > ipeak) ipeak = ival;
+            if (qval > qpeak) qpeak = qval;
+        }
+
+        interval += n_read / 2;
+        if (interval > samp_rate * interval_seconds){
+            iavg /= interval;
+            qavg /= interval;
+            fprintf(stderr, "PEAK %5.1f | %5.1f dBFS   PAR %4.1f | %4.1f dB\n",
+                    db(ipeak), db(qpeak), db(ipeak / iavg), db(qpeak / qavg));
+            interval = 0;
+            ipeak = qpeak = iavg = qavg = 0; 
+        };
+
+        //////////////////////////////////////////
+
 
 			for (int n=0; n<n_read; n++) buffer[n] = buffer[n] - 128;
 

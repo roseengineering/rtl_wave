@@ -1,6 +1,6 @@
 
 CFLAGS?=-O2 -g -Wall
-LDLIBS+=-lrtlsdr
+LDLIBS+=-lrtlsdr -lm
 CC?=gcc
 PROGNAME=rtl_wave
 
